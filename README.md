@@ -1,1 +1,3 @@
 # xselect
+
+Stock selection application.
