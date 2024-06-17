@@ -47,7 +47,7 @@ app.layout = dbc.Container(
         dbc.Row(dbc.Col(banner), className="m-3"),
         html.H2("XSelect", style={
             "text-align": "center", "margin-top": "10px"}),
-        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only. Genie Go Pte Ltd is not a financial advisor and the information contained on this Website is not a substitute for financial advice from a licensed advisor.", style={
+        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only.", style={
             "textAlign": "left"}, size='sm'), width=9), justify='center'),
         html.H4("Use tabs to navigate", style={
             "text-align": "center", "margin-top": "10px", "margin-bottom": "10px"}),
