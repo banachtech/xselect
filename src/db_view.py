@@ -54,7 +54,7 @@ def view_table(database_path, table_name):
 
 def main():
     database_path = "data/finance_data.db"  # Path to your SQLite database
-    tables = ["company_overviews","historical_prices","quaterly_earnings"] # 
+    tables = ["company_overviews"] #,"historical_prices","quaterly_earnings"] # 
     
     for table in tables[0:]:
         view_table(database_path, table)

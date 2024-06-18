@@ -39,40 +39,114 @@ prices = prices.pivot(index='timestamp', columns='symbol', values='adjusted_clos
 quaterly_earnings = pd.read_sql("SELECT * FROM quaterly_earnings", con=eng1)
 
 
-# Initialize the app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter', 
+               'MarketCapitalization', 'PERatio', 'DividendYield', 'ProfitMargin', 'OperatingMargin', 
+               'ReturnOnAssets', 'ReturnOnEquity', 'QuarterlyEarningsGrowthYOY', 'AnalystTargetPrice', 
+               'AnalystRatingStrongBuy', 'AnalystRatingBuy', 'AnalystRatingHold', 'AnalystRatingSell', 
+               'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio', 
+               'EVToEBITDA', 'Beta', 'Week52High', 'Week52Low', 'Day50MovingAverage', 'Day200MovingAverage']
+
+
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME], suppress_callback_exceptions=True)
 
 app.layout = dbc.Container(
     [
+        dcc.Store(id='store-data', storage_type='session'),
         dbc.Row(dbc.Col(banner), className="m-3"),
-        html.H2("XSelect", style={
-            "text-align": "center", "margin-top": "10px"}),
-        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only.", style={
-            "textAlign": "left"}, size='sm'), width=9), justify='center'),
-        html.H4("Use tabs to navigate", style={
-            "text-align": "center", "margin-top": "10px", "margin-bottom": "10px"}),
-            dcc.Tabs([
-                dcc.Tab(label='Company Overviews', children=[
-                    dash_table.DataTable(
-                        id='table',
-                        columns=[
-                            {"name": col, "id": col} for col in ['Symbol', 'Name', 'Sector', 'Industry', 'ProfitMargin']
-                        ],
-                        data=overview.to_dict('records'),
-                        page_size=10,  # Set the number of rows per page
-                        page_action='native',  # Enable native pagination
-                        style_table={'overflowX': 'auto'},
-                        style_header={'backgroundColor': 'rgb(30, 30, 30)', 'color': 'white'},
-                        style_data={'backgroundColor': 'rgb(50, 50, 50)', 'color': 'white'},
-                        style_cell={'textAlign': 'left'},
-                        style_as_list_view=True,
-                    )
-                ])
+        html.H2("XSelect", style={"text-align": "center", "margin-top": "10px"}),
+        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only.", 
+                                  style={"textAlign": "left"}, size='sm'), width=9), justify='center'),
+        html.H4("Use tabs to navigate", style={"text-align": "center", "margin-top": "10px", "margin-bottom": "10px"}),
 
+        dcc.Tabs([
+            dcc.Tab(label='Company Overviews', children=[
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Label("Select columns to display:"),
+                        dcc.Dropdown(
+                            id='column-selector',
+                            options=[{"label": col, "value": col} for col in all_columns],
+                            value=['Symbol', 'Name', 'Sector', 'Industry', 'ProfitMargin'],  
+                            multi=True
+                        )
+                    ], width=12)
+                ], className="mb-4"),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Label("Select sector:"),
+                        dcc.Dropdown(
+                            id='sector-selector',
+                            options=[{"label": sector, "value": sector} for sector in overview['Sector'].unique()],
+                            value=None,
+                            multi=True
+                        )
+                    ], width=6),
+                    dbc.Col([
+                        dbc.Label("Select industry:"),
+                        dcc.Dropdown(
+                            id='industry-selector',
+                            options=[{"label": industry, "value": industry} for industry in overview['Industry'].unique()],
+                            value=None,
+                            multi=True
+                        )
+                    ], width=6)
+                ], className="mb-4"),
+                dash_table.DataTable(
+                    id='table',
+                    page_size=10,
+                    page_action='native',
+                    style_table={'overflowX': 'auto'},
+                    style_header={'backgroundColor': 'rgb(30, 30, 30)', 'color': 'white'},
+                    style_data={'backgroundColor': 'rgb(50, 50, 50)', 'color': 'white'},
+                    style_cell={'textAlign': 'left'},
+                    style_as_list_view=True,
+                )
             ])
+        ])
     ]
 )
 
+@app.callback(
+    Output('store-data', 'data'),
+    Input('column-selector', 'value'),
+    Input('sector-selector', 'value'),
+    Input('industry-selector', 'value')
+)
+def store_selections(selected_columns, selected_sectors, selected_industries):
+    return {
+        'selected_columns': selected_columns,
+        'selected_sectors': selected_sectors,
+        'selected_industries': selected_industries
+    }
+
+@app.callback(
+    Output('column-selector', 'value'),
+    Output('sector-selector', 'value'),
+    Output('industry-selector', 'value'),
+    Output('table', 'columns'),
+    Output('table', 'data'),
+    Input('store-data', 'data'),
+    State('column-selector', 'value'),
+    State('sector-selector', 'value'),
+    State('industry-selector', 'value')
+)
+def update_table(stored_data, selected_columns, selected_sectors, selected_industries):
+    if stored_data:
+        selected_columns = stored_data['selected_columns']
+        selected_sectors = stored_data['selected_sectors']
+        selected_industries = stored_data['selected_industries']
+    
+    filtered_df = overview.copy()
+    
+    if selected_sectors:
+        filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sectors)]
+    
+    if selected_industries:
+        filtered_df = filtered_df[filtered_df['Industry'].isin(selected_industries)]
+    
+    columns = [{"name": col, "id": col} for col in selected_columns]
+    data = filtered_df[selected_columns].to_dict('records')
+    return selected_columns, selected_sectors, selected_industries, columns, data
 
 # Run the app
 if __name__ == '__main__':
