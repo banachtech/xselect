@@ -292,6 +292,16 @@ def save_historical_prices_latest(dfs, engine):
     except Exception as e:
         print(e)
 
+def check_symbol(symbol):
+    url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={apikey}&datatype=csv&outputsize=full'
+    px = pd.read_csv(url)
+    if not px.empty:
+        px = px.iloc[:,:2]
+        return px 
+    else:
+        return False
+
+
 
 def main(n: int):
     sp100 = pd.read_csv("data/sp100.csv")

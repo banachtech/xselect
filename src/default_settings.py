@@ -3,6 +3,7 @@ import os
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
 sys.path.append(base_dir)
 financials_path = os.path.join(base_dir,'data', 'finance_data.db') 
+fake_financials_path = os.path.join(base_dir,'data', 'financials.db') 
 baskets_path = os.path.join(base_dir, 'data', 'baskets.db') 
 
 # MC settings
@@ -16,6 +17,7 @@ FEDFUNDS_FILE = 'data/fedfunds.csv'
 FCN_BASKETS_FILE = 'data/fcn-baskets.csv'
 MACRO_FILE = 'data/macro.csv'
 FINANCIALS_DB_URL = f"sqlite:///{financials_path}"
+FAKE_FINANCIALS_DB_URL = f"sqlite:///{fake_financials_path}"
 BASKETS_DB_URL = f"sqlite:///{baskets_path}"
 
 # Market data

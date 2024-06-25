@@ -30,14 +30,15 @@ banner = html.Header(
 )
 
 # connect to db
-eng1 = create_engine(FINANCIALS_DB_URL)
+eng1 = create_engine(FAKE_FINANCIALS_DB_URL)
+eng2 = create_engine(FINANCIALS_DB_URL)
 
 overview = pd.read_sql("SELECT * FROM company_overviews", con=eng1)
 
-prices = pd.read_sql("SELECT * FROM historical_prices", con=eng1, parse_dates=['timestamp']) # format the dataframe so symbols are columns
+prices = pd.read_sql("SELECT * FROM historical_prices", con=eng2, parse_dates=['timestamp']) # CHANGE TO ENG1 for PRODUCTION!!!!!!
 prices = prices.pivot(index='timestamp', columns='symbol', values='adjusted_close')
 
-quaterly_earnings = pd.read_sql("SELECT * FROM quaterly_earnings", con=eng1)
+quaterly_earnings = pd.read_sql("SELECT * FROM quaterly_earnings", con=eng2)
 
 
 all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter', 
@@ -47,6 +48,7 @@ all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry'
                'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio', 
                'EVToEBITDA', 'Beta', 'Week52High', 'Week52Low', 'Day50MovingAverage', 'Day200MovingAverage']
 
+unique_companies = overview.drop_duplicates(subset=['Name', 'Symbol'])
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME], suppress_callback_exceptions=True)
 
@@ -118,7 +120,7 @@ app.layout = dbc.Container(
                         dbc.Label("Select companies to graph:"),
                         dcc.Dropdown(
                             id='company-selector',
-                            options=[{"label": row['Name'], "value": row['Symbol']} for index, row in overview.iterrows()],
+                            options=[{"label": row['Name'], "value": row['Symbol']} for index, row in unique_companies.iterrows()],
                             value=[],
                             multi=True,
                             clearable=False
@@ -166,6 +168,29 @@ app.layout = dbc.Container(
     ]
 )
 
+# @app.callback(
+#     Output('timeseries-graph', 'figure'),
+#     Input('metric-selector', 'value'),
+#     Input('company-selector', 'value')
+# )
+# def update_timeseries_graph(metric, companies):
+#     fig = go.Figure()
+
+#     if companies:
+#         for symbol in companies:
+#             df = pd.read_sql(f"SELECT timestamp, {metric} FROM historical_prices WHERE symbol='{symbol}'", con=eng1)
+#             fig.add_trace(go.Scatter(x=df['timestamp'], y=df[metric], mode='lines+markers', name=symbol))
+
+#     fig.update_layout(
+#         title=f'{metric} Over Time',
+#         xaxis_title='Date',
+#         yaxis_title=metric,
+#         hovermode='x',
+#         template='plotly_dark'
+#     )
+
+#     return fig
+
 @app.callback(
     Output('timeseries-graph', 'figure'),
     Input('metric-selector', 'value'),
@@ -176,18 +201,27 @@ def update_timeseries_graph(metric, companies):
 
     if companies:
         for symbol in companies:
-            df = pd.read_sql(f"SELECT timestamp, {metric} FROM historical_prices WHERE symbol='{symbol}'", con=eng1)
-            fig.add_trace(go.Scatter(x=df['timestamp'], y=df[metric], mode='lines+markers', name=symbol))
+            query = f"""
+            SELECT DateAppend, {metric}
+            FROM company_overviews
+            WHERE symbol = '{symbol}'
+            ORDER BY current_date
+            """
+            df = pd.read_sql(query, con=eng1)
+            print(df) 
+            if not df.empty:
+                fig.add_trace(go.Scatter(x=df['DateAppend'], y=df[metric], mode='lines+markers', name=symbol))
 
     fig.update_layout(
         title=f'{metric} Over Time',
         xaxis_title='Date',
         yaxis_title=metric,
         hovermode='x',
-        template='plotly_dark'
+        template='simple_white'
     )
 
     return fig
+
 
 @app.callback(
     Output('store-data', 'data'),
