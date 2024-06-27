@@ -304,8 +304,8 @@ def check_symbol(symbol):
 
 
 def main(n: int):
-    sp100 = pd.read_csv("data/sp100.csv")
-    symbols = sp100["Symbol"][:]
+    sp100 = pd.read_csv("../data/sp500-tickers.csv")
+    symbols = sp100["Ticker"][:]
 
     # company overviews
     print('downloading company overviews ...')

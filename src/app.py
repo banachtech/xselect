@@ -21,6 +21,7 @@ from sqlalchemy import create_engine
 from src.default_settings import *
 from helpers.layout import *
 import logging
+from data import main
 logging.basicConfig(filename='app.log', level=logging.INFO)
 
 logo = base64.b64encode(open('../assets/logo.png', 'rb').read()).decode('utf-8')
@@ -48,7 +49,11 @@ all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry'
                'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio', 
                'EVToEBITDA', 'Beta', 'Week52High', 'Week52Low', 'Day50MovingAverage', 'Day200MovingAverage']
 
-unique_companies = overview.drop_duplicates(subset=['Name', 'Symbol'])
+some_columns = ['Name', 'Symbol','Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter']
+remaining_columns = [col for col in all_columns if col not in some_columns]
+
+unique_companies = overview.drop_duplicates(subset=['Name', 'Symbol','Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter'])
+
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME], suppress_callback_exceptions=True)
 
@@ -68,7 +73,7 @@ app.layout = dbc.Container(
                         dbc.Label("Select columns to display:"),
                         dcc.Dropdown(
                             id='column-selector',
-                            options=[{"label": col, "value": col} for col in all_columns],
+                            options=[{"label": col, "value": col} for col in some_columns],
                             value=['Symbol', 'Name', 'Sector', 'Industry', 'ProfitMargin'],  
                             multi=True
                         )
@@ -96,8 +101,8 @@ app.layout = dbc.Container(
                 ], className="mb-4"),
                 dash_table.DataTable(
                     id='table',
-                    columns=[{"name": col, "id": col} for col in all_columns],
-                    data=overview.to_dict('records'),
+                    columns=[{"name": col, "id": col} for col in some_columns],
+                    data=unique_companies.to_dict('records'),
                     page_size=10,
                     page_action='native',
                     style_table={'overflowX': 'auto'},
@@ -111,7 +116,7 @@ app.layout = dbc.Container(
                         dbc.Label("Select metric to graph:"),
                         dcc.Dropdown(
                             id='metric-selector',
-                            options=[{"label": col, "value": col} for col in all_columns if col != 'Symbol'],
+                            options=[{"label": col, "value": col} for col in remaining_columns if col != 'Symbol'],
                             value='ProfitMargin',
                             clearable=False,
                         )
@@ -164,7 +169,12 @@ app.layout = dbc.Container(
                     ], width=12, style={'padding': '10px'}),
                 ], justify='center', className="mb-4")
             ])
-        ])
+        ]),
+        dcc.Interval(
+            id='interval-component',
+            interval=1209600000,  # 1,209,600,000 ms = 2 weeks
+            n_intervals=0
+        ),
     ]
 )
 
@@ -191,6 +201,7 @@ app.layout = dbc.Container(
 
 #     return fig
 
+# graphing the timeseries graph for overivew data
 @app.callback(
     Output('timeseries-graph', 'figure'),
     Input('metric-selector', 'value'),
@@ -222,7 +233,7 @@ def update_timeseries_graph(metric, companies):
 
     return fig
 
-
+# storing the selected columns, sectors, and industries
 @app.callback(
     Output('store-data', 'data'),
     Input('column-selector', 'value'),
@@ -236,6 +247,7 @@ def store_selections(selected_columns, selected_sectors, selected_industries):
         'selected_industries': selected_industries
     }
 
+# updating the table
 @app.callback(
     Output('column-selector', 'value'),
     Output('sector-selector', 'value'),
@@ -253,7 +265,7 @@ def update_table(stored_data, selected_columns, selected_sectors, selected_indus
         selected_sectors = stored_data['selected_sectors']
         selected_industries = stored_data['selected_industries']
     
-    filtered_df = overview.copy()
+    filtered_df = unique_companies.copy()
     
     if selected_sectors:
         filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sectors)]
@@ -266,7 +278,7 @@ def update_table(stored_data, selected_columns, selected_sectors, selected_indus
     return selected_columns, selected_sectors, selected_industries, columns, data
 
 
-# Callback to check ticker and update the result
+# callback to check ticker and update the result
 @app.callback(
     Output('ticker-result', 'children'),
     Input('check-ticker-btn', 'n_clicks'),
@@ -301,6 +313,7 @@ def check_ticker(n_clicks, ticker):
             return html.Div("Ticker does not exist", style={'color': 'red'})
     return ""
 
+# floating table that shows if a ticker exists
 @app.callback(
     Output("modal", "is_open"),
     Input("close-modal", "n_clicks"),
@@ -310,6 +323,16 @@ def toggle_modal(n_clicks, is_open):
     if n_clicks:
         return not is_open
     return is_open
+
+# interval component to update the database
+@app.callback(
+    Output('store-data', 'data'),
+    Input('interval-component', 'n_intervals')
+)
+def update_data(n):
+    main()  
+    return {}  
+
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
