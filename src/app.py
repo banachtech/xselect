@@ -49,9 +49,11 @@ all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry'
                'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio', 
                'EVToEBITDA', 'Beta', 'Week52High', 'Week52Low', 'Day50MovingAverage', 'Day200MovingAverage']
 
+# splitting columns for the visualization part
 some_columns = ['Name', 'Symbol','Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter']
 remaining_columns = [col for col in all_columns if col not in some_columns]
 
+# removing duplicates for overview section
 unique_companies = overview.drop_duplicates(subset=['Name', 'Symbol','Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter'])
 
 
@@ -67,7 +69,7 @@ app.layout = dbc.Container(
         html.H4("Use tabs to navigate", style={"text-align": "center", "margin-top": "10px", "margin-bottom": "10px"}),
 
         dcc.Tabs([
-            dcc.Tab(label='Company Overviews', children=[
+            dcc.Tab(label='Company Overviews', children=[ 
                 dbc.Row([
                     dbc.Col([
                         dbc.Label("Select columns to display:"),
@@ -99,7 +101,7 @@ app.layout = dbc.Container(
                         )
                     ], width=6)
                 ], className="mb-4"),
-                dash_table.DataTable(
+                dash_table.DataTable( # table for the overview
                     id='table',
                     columns=[{"name": col, "id": col} for col in some_columns],
                     data=unique_companies.to_dict('records'),
@@ -113,7 +115,7 @@ app.layout = dbc.Container(
                 ),
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Select metric to graph:"),
+                        dbc.Label("Select metric to graph:"), 
                         dcc.Dropdown(
                             id='metric-selector',
                             options=[{"label": col, "value": col} for col in remaining_columns if col != 'Symbol'],
@@ -132,7 +134,7 @@ app.layout = dbc.Container(
                         )
                     ], width=6)
                 ], className="mb-4"),
-                dcc.Graph(id='timeseries-graph')
+                dcc.Graph(id='timeseries-graph') # timeseries graph
             ]),
             dcc.Tab(label='Settings', children=[
                 dbc.Row([
