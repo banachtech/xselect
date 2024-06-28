@@ -8,7 +8,7 @@ from scipy.optimize import minimize_scalar
 from dash import dash, Dash, dcc, html, Input, Output, State, no_update, dash_table
 from datetime import datetime
 from data import check_symbol
-
+import time
 import sys
 import os
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
@@ -21,7 +21,7 @@ from sqlalchemy import create_engine
 from src.default_settings import *
 from helpers.layout import *
 import logging
-from data import main
+from data import get_overview,get_prices,get_quaterly_earnings, save_company_overview, save_historical_prices, save_quaterly_earnings
 logging.basicConfig(filename='app.log', level=logging.INFO)
 
 logo = base64.b64encode(open('../assets/logo.png', 'rb').read()).decode('utf-8')
@@ -163,6 +163,7 @@ app.layout = dbc.Container(
                             style={'width': '80%'}
                         ),
                         dbc.Button("Check Ticker", id='check-ticker-btn', color='primary', className='ms-2'),
+                        dbc.Button("Update Ticker", id='update-ticker-btn', color='secondary', className='ms-2'),
                     ], width=6, style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'padding': '10px'}),
                 ], justify='center', className="mb-4"),
                 dbc.Row([
@@ -328,12 +329,151 @@ def toggle_modal(n_clicks, is_open):
 
 # interval component to update the database
 @app.callback(
-    Output('store-data', 'data'),
-    Input('interval-component', 'n_intervals')
+    Output('store-data', 'data', allow_duplicate=True),
+    Input('interval-component', 'n_intervals'),
+    prevent_initial_call=True
 )
 def update_data(n):
-    main()  
+    query = f"""
+            SELECT symbol
+            FROM company_overviews
+            """
+    df = pd.read_sql(query, con=eng1)
+    symbols = df["symbol"].tolist()
+    print('downloading company overviews ...')
+    st = time.time()
+    res = []
+    for symbol in symbols:
+        try:
+            print(symbol)
+            tmp = get_overview(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            res.append(tmp)
+    
+    ed = time.time() - st
+    
+    if res:
+        res = pd.concat(res, axis=0)
+        print(f'{res.shape[0]} symbols processed in {ed:0.2f} seconds')
+        save_company_overview(res, eng1)
+
+    # historical stock prices 
+    print('downloading historical stock prices ...')
+
+    st = time.time()
+    ps = []
+    for symbol in symbols:
+        try:
+            tmp = get_prices(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            ps.append(tmp)
+    ed = time.time() - st
+    
+    if ps:
+        ps = pd.concat(ps, axis=1)
+        print(f'{ps.shape[1]} symbols processed in {ed:0.2f} seconds')
+        save_historical_prices(ps, eng2)
+    
+    # quaterly earnings
+    print('downloading quaterly earnings ...')
+    st = time.time()
+    res = []
+    for symbol in symbols:
+        try:
+            tmp = get_quaterly_earnings(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            res.append(tmp)
+    ed = time.time() - st
+    
+    if res:
+        res = pd.concat(res, axis=0)
+        print(f'{res.shape[1]} symbols processed in {ed:0.2f} seconds')
+        save_quaterly_earnings(res, eng2)
     return {}  
+
+# callback to update the ticker based on the input symbol
+@app.callback(
+    Output('ticker-input', 'value'),
+    [Input('update-ticker-btn', 'n_clicks')],
+    [State('ticker-input', 'value')]
+)
+def update_ticker(n_clicks, ticker):
+    if n_clicks is not None and ticker:
+        update_data_for_symbol(ticker)
+    return ''
+
+def update_data_for_symbol(ticker):
+    symbols = [ticker]
+    
+    # company overviews
+    print('downloading company overviews ...')
+    st = time.time()
+    res = []
+    for symbol in symbols:
+        try:
+            print(symbol)
+            tmp = get_overview(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            res.append(tmp)
+    
+    ed = time.time() - st
+    
+    if res:
+        res = pd.concat(res, axis=0)
+        print(f'{res.shape[0]} symbols processed in {ed:0.2f} seconds')
+        save_company_overview(res, eng1)
+
+    # historical stock prices 
+    print('downloading historical stock prices ...')
+
+    st = time.time()
+    ps = []
+    for symbol in symbols:
+        try:
+            tmp = get_prices(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            ps.append(tmp)
+    ed = time.time() - st
+    
+    if ps:
+        ps = pd.concat(ps, axis=1)
+        print(f'{ps.shape[1]} symbols processed in {ed:0.2f} seconds')
+        save_historical_prices(ps, eng1)
+    
+    # quaterly earnings
+    print('downloading quaterly earnings ...')
+    st = time.time()
+    res = []
+    for symbol in symbols:
+        try:
+            tmp = get_quaterly_earnings(symbol)
+        except Exception as e:
+            print(f'skipped symbol {symbol}')
+            print(e)
+        else:
+            res.append(tmp)
+    ed = time.time() - st
+    
+    if res:
+        res = pd.concat(res, axis=0)
+        print(f'{res.shape[1]} symbols processed in {ed:0.2f} seconds')
+        save_quaterly_earnings(res, eng1)
+
 
 # Run the app
 if __name__ == '__main__':
