@@ -85,7 +85,6 @@ Base.metadata.create_all(engine)
 url = "http://www.alphavantage.co/query"
 load_dotenv()
 apikey = os.getenv('ALPHAVANTAGE_API_KEY')
-print(apikey)
 max_workers = os.cpu_count() * 2
 _ov_items = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter', 'MarketCapitalization', 'PERatio', 'DividendYield', 'ProfitMargin', 'OperatingMarginTTM', 'ReturnOnAssetsTTM', 'ReturnOnEquityTTM', 'QuarterlyEarningsGrowthYOY', 'AnalystTargetPrice', 'AnalystRatingStrongBuy', 'AnalystRatingBuy', 'AnalystRatingHold', 'AnalystRatingSell', 'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatioTTM', 'PriceToBookRatio', 'EVToEBITDA', 'Beta', '52WeekHigh', '52WeekLow', '50DayMovingAverage', '200DayMovingAverage']
 
