@@ -144,16 +144,11 @@ def get_quaterly_earnings(symbol):
     df['reported_date'] = pd.to_datetime(df['reported_date']).apply(lambda x: x.timestamp())
     df = df.drop('surprise', axis=1)
     df = df.drop('reportTime', axis=1)
-    # df['reported_eps'] = df['reported_eps'].astype(float)
-    # df['estimated_eps'] = df['estimated_eps'].astype(float)
-    # df['surprise_percentage'] = df['surprise_percentage'].astype(float)
-    # df.set_index('reported_date', inplace=True)
     return df
 
 def check_if_exist(symbol, tmp):
     session = Session()
     latest_timestamp = session.query(func.max(HistoricalPrice.timestamp)).filter_by(symbol=symbol)
-    # latest_datetime = latest_timestamp.fromtimestamp(datetime.UTC)
     
     session.close()
     # print(tmp['timestamp'])

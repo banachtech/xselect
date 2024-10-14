@@ -1,17 +1,16 @@
-import itertools
+
 import pandas as pd
 import numpy as np
-import json
-import hashlib
-import statistics
+
 from scipy.optimize import minimize_scalar
-from dash import dash, Dash, dcc, html, Input, Output, State, no_update, dash_table
+from dash import dash, Dash, dcc, html, Input, Output, State, no_update, dash_table, callback_context
 from datetime import datetime
+from dash.exceptions import PreventUpdate
 from data import check_symbol
 import time
 import sys
 import os
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)
 
 import dash_bootstrap_components as dbc
@@ -34,7 +33,8 @@ banner = html.Header(
 eng1 = create_engine(FAKE_FINANCIALS_DB_URL)
 eng2 = create_engine(FINANCIALS_DB_URL)
 
-overview = pd.read_sql("SELECT * FROM company_overviews", con=eng1)
+overview = pd.read_sql("SELECT * FROM company_overviews", con=eng2)
+print(overview)
 
 prices = pd.read_sql("SELECT * FROM historical_prices", con=eng2, parse_dates=['timestamp']) # CHANGE TO ENG1 for PRODUCTION!!!!!!
 prices = prices.pivot(index='timestamp', columns='symbol', values='adjusted_close')
@@ -42,11 +42,11 @@ prices = prices.pivot(index='timestamp', columns='symbol', values='adjusted_clos
 quaterly_earnings = pd.read_sql("SELECT * FROM quaterly_earnings", con=eng2)
 
 
-all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter', 
-               'MarketCapitalization', 'PERatio', 'DividendYield', 'ProfitMargin', 'OperatingMargin', 
-               'ReturnOnAssets', 'ReturnOnEquity', 'QuarterlyEarningsGrowthYOY', 'AnalystTargetPrice', 
-               'AnalystRatingStrongBuy', 'AnalystRatingBuy', 'AnalystRatingHold', 'AnalystRatingSell', 
-               'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio', 
+all_columns = ['Symbol', 'Name', 'Description', 'Currency', 'Sector', 'Industry', 'LatestQuarter',
+               'MarketCapitalization', 'PERatio', 'DividendYield', 'ProfitMargin', 'OperatingMargin',
+               'ReturnOnAssets', 'ReturnOnEquity', 'QuarterlyEarningsGrowthYOY', 'AnalystTargetPrice',
+               'AnalystRatingStrongBuy', 'AnalystRatingBuy', 'AnalystRatingHold', 'AnalystRatingSell',
+               'AnalystRatingStrongSell', 'TrailingPE', 'ForwardPE', 'PriceToSalesRatio', 'PriceToBookRatio',
                'EVToEBITDA', 'Beta', 'Week52High', 'Week52Low', 'Day50MovingAverage', 'Day200MovingAverage']
 
 # splitting columns for the visualization part
@@ -64,19 +64,19 @@ app.layout = dbc.Container(
         dcc.Store(id='store-data', storage_type='session'),
         dbc.Row(dbc.Col(banner), className="m-3"),
         html.H2("XSelect", style={"text-align": "center", "margin-top": "10px"}),
-        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only.", 
+        dbc.Row(dbc.Col(dbc.Label("Disclaimer: Information contained on this Website is not financial or investment advice and is meant for educational purposes only.",
                                   style={"textAlign": "left"}, size='sm'), width=9), justify='center'),
         html.H4("Use tabs to navigate", style={"text-align": "center", "margin-top": "10px", "margin-bottom": "10px"}),
 
         dcc.Tabs([
-            dcc.Tab(label='Company Overviews', children=[ 
+            dcc.Tab(label='Company Overviews', children=[
                 dbc.Row([
                     dbc.Col([
                         dbc.Label("Select columns to display:"),
                         dcc.Dropdown(
                             id='column-selector',
                             options=[{"label": col, "value": col} for col in some_columns],
-                            value=['Symbol', 'Name', 'Sector', 'Industry', 'ProfitMargin'],  
+                            value=['Symbol', 'Name', 'Sector', 'Industry', 'ProfitMargin'],
                             multi=True
                         )
                     ], width=12)
@@ -115,7 +115,7 @@ app.layout = dbc.Container(
                 ),
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Select metric to graph:"), 
+                        dbc.Label("Select metric to graph:"),
                         dcc.Dropdown(
                             id='metric-selector',
                             options=[{"label": col, "value": col} for col in remaining_columns if col != 'Symbol'],
@@ -181,30 +181,6 @@ app.layout = dbc.Container(
     ]
 )
 
-# @app.callback(
-#     Output('timeseries-graph', 'figure'),
-#     Input('metric-selector', 'value'),
-#     Input('company-selector', 'value')
-# )
-# def update_timeseries_graph(metric, companies):
-#     fig = go.Figure()
-
-#     if companies:
-#         for symbol in companies:
-#             df = pd.read_sql(f"SELECT timestamp, {metric} FROM historical_prices WHERE symbol='{symbol}'", con=eng1)
-#             fig.add_trace(go.Scatter(x=df['timestamp'], y=df[metric], mode='lines+markers', name=symbol))
-
-#     fig.update_layout(
-#         title=f'{metric} Over Time',
-#         xaxis_title='Date',
-#         yaxis_title=metric,
-#         hovermode='x',
-#         template='plotly_dark'
-#     )
-
-#     return fig
-
-# graphing the timeseries graph for overivew data
 @app.callback(
     Output('timeseries-graph', 'figure'),
     Input('metric-selector', 'value'),
@@ -222,7 +198,7 @@ def update_timeseries_graph(metric, companies):
             ORDER BY current_date
             """
             df = pd.read_sql(query, con=eng1)
-            print(df) 
+            print(df)
             if not df.empty:
                 fig.add_trace(go.Scatter(x=df['DateAppend'], y=df[metric], mode='lines+markers', name=symbol))
 
@@ -236,49 +212,58 @@ def update_timeseries_graph(metric, companies):
 
     return fig
 
-# storing the selected columns, sectors, and industries
+# Update selectors and store data when user interacts with selectors
 @app.callback(
     Output('store-data', 'data'),
-    Input('column-selector', 'value'),
-    Input('sector-selector', 'value'),
-    Input('industry-selector', 'value')
-)
-def store_selections(selected_columns, selected_sectors, selected_industries):
-    return {
-        'selected_columns': selected_columns,
-        'selected_sectors': selected_sectors,
-        'selected_industries': selected_industries
-    }
-
-# updating the table
-@app.callback(
     Output('column-selector', 'value'),
     Output('sector-selector', 'value'),
     Output('industry-selector', 'value'),
+    Input('column-selector', 'value'),
+    Input('sector-selector', 'value'),
+    Input('industry-selector', 'value'),
+    State('store-data', 'data')
+)
+def update_selections_and_store(columns, sectors, industries, stored_data):
+    if not callback_context.triggered_id:
+        raise PreventUpdate
+    
+    if stored_data is None:
+        stored_data = {}
+    
+    if callback_context.triggered_id == 'column-selector':
+        stored_data['selected_columns'] = columns
+    elif callback_context.triggered_id == 'sector-selector':
+        stored_data['selected_sectors'] = sectors
+    elif callback_context.triggered_id == 'industry-selector':
+        stored_data['selected_industries'] = industries
+    
+    return stored_data, stored_data.get('selected_columns', columns), stored_data.get('selected_sectors', sectors), stored_data.get('selected_industries', industries)
+
+# Updating the table
+@app.callback(
     Output('table', 'columns'),
     Output('table', 'data'),
-    Input('store-data', 'data'),
-    State('column-selector', 'value'),
-    State('sector-selector', 'value'),
-    State('industry-selector', 'value')
+    Input('store-data', 'data')
 )
-def update_table(stored_data, selected_columns, selected_sectors, selected_industries):
-    if stored_data:
-        selected_columns = stored_data['selected_columns']
-        selected_sectors = stored_data['selected_sectors']
-        selected_industries = stored_data['selected_industries']
-    
+def update_table(stored_data):
+    if not stored_data:
+        raise PreventUpdate
+
+    selected_columns = stored_data.get('selected_columns', [])
+    selected_sectors = stored_data.get('selected_sectors', [])
+    selected_industries = stored_data.get('selected_industries', [])
+
     filtered_df = unique_companies.copy()
-    
+
     if selected_sectors:
         filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sectors)]
-    
+
     if selected_industries:
         filtered_df = filtered_df[filtered_df['Industry'].isin(selected_industries)]
-    
+
     columns = [{"name": col, "id": col} for col in selected_columns]
     data = filtered_df[selected_columns].to_dict('records')
-    return selected_columns, selected_sectors, selected_industries, columns, data
+    return columns, data
 
 
 # callback to check ticker and update the result
@@ -352,15 +337,15 @@ def update_data(n):
             print(e)
         else:
             res.append(tmp)
-    
+
     ed = time.time() - st
-    
+
     if res:
         res = pd.concat(res, axis=0)
         print(f'{res.shape[0]} symbols processed in {ed:0.2f} seconds')
         save_company_overview(res, eng1)
 
-    # historical stock prices 
+    # historical stock prices
     print('downloading historical stock prices ...')
 
     st = time.time()
@@ -374,12 +359,12 @@ def update_data(n):
         else:
             ps.append(tmp)
     ed = time.time() - st
-    
+
     if ps:
         ps = pd.concat(ps, axis=1)
         print(f'{ps.shape[1]} symbols processed in {ed:0.2f} seconds')
         save_historical_prices(ps, eng2)
-    
+
     # quaterly earnings
     print('downloading quaterly earnings ...')
     st = time.time()
@@ -393,27 +378,17 @@ def update_data(n):
         else:
             res.append(tmp)
     ed = time.time() - st
-    
+
     if res:
         res = pd.concat(res, axis=0)
         print(f'{res.shape[1]} symbols processed in {ed:0.2f} seconds')
         save_quaterly_earnings(res, eng2)
-    return {}  
+    return {}
 
 # callback to update the ticker based on the input symbol
-@app.callback(
-    Output('ticker-input', 'value'),
-    [Input('update-ticker-btn', 'n_clicks')],
-    [State('ticker-input', 'value')]
-)
-def update_ticker(n_clicks, ticker):
-    if n_clicks is not None and ticker:
-        update_data_for_symbol(ticker)
-    return ''
-
 def update_data_for_symbol(ticker):
     symbols = [ticker]
-    
+
     # company overviews
     print('downloading company overviews ...')
     st = time.time()
@@ -427,15 +402,15 @@ def update_data_for_symbol(ticker):
             print(e)
         else:
             res.append(tmp)
-    
+
     ed = time.time() - st
-    
+
     if res:
         res = pd.concat(res, axis=0)
         print(f'{res.shape[0]} symbols processed in {ed:0.2f} seconds')
         save_company_overview(res, eng1)
 
-    # historical stock prices 
+    # historical stock prices
     print('downloading historical stock prices ...')
 
     st = time.time()
@@ -449,12 +424,12 @@ def update_data_for_symbol(ticker):
         else:
             ps.append(tmp)
     ed = time.time() - st
-    
+
     if ps:
         ps = pd.concat(ps, axis=1)
         print(f'{ps.shape[1]} symbols processed in {ed:0.2f} seconds')
         save_historical_prices(ps, eng1)
-    
+
     # quaterly earnings
     print('downloading quaterly earnings ...')
     st = time.time()
@@ -468,13 +443,23 @@ def update_data_for_symbol(ticker):
         else:
             res.append(tmp)
     ed = time.time() - st
-    
+
     if res:
         res = pd.concat(res, axis=0)
         print(f'{res.shape[1]} symbols processed in {ed:0.2f} seconds')
         save_quaterly_earnings(res, eng1)
 
+@app.callback(
+    Output('ticker-input', 'value'),
+    [Input('update-ticker-btn', 'n_clicks')],
+    [State('ticker-input', 'value')]
+)
+def update_ticker(n_clicks, ticker):
+    if n_clicks is not None and ticker:
+        update_data_for_symbol(ticker)
+    return ''
+
 
 # Run the app
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=9999)
